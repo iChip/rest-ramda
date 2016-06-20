@@ -1,0 +1,21 @@
+{
+  "name": "bench",
+  "version": "1.0.0",
+  "description": "bench rest test",
+  "main": "main.js",
+  "dependencies": {
+    "ramda": "^0.21.0",
+    "request-promise": "^3.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "bench",
+    "rest",
+    "test"
+  ],
+  "author": "iChip",
+  "license": "ISC"
+}
