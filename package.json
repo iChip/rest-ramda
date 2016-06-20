@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "rest test using ramda",
   "main": "main.js",
+  "engines": {
+    "node": "0.10.32"
+  },
   "dependencies": {
     "ramda": "^0.21.0",
     "request-promise": "^3.0.0"
