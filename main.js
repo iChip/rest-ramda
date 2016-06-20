@@ -2,30 +2,28 @@ var R = require('ramda'),
 	request = require('request-promise');
 
 var baseUrl = 'http://resttest.bench.co/transactions/';
-var transactions = [];
 var getTransactions = R.prop('transactions');
 var getTotalCount = R.prop('totalCount');
 var vendorLens = R.lens(R.prop('Company'), R.assoc('Company'));
 var cleanTransaction = R.over(vendorLens, cleanVendorName);
-var currentCount = 0;
 
-function pageRequest(pageNo) {
-	var paginatedUrl = [baseUrl, pageNo, '.json'].join('');
+function pageRequest(pageNo, txCount, transactions) {
+	var paginatedUrl = [ baseUrl, pageNo, '.json' ].join('');
 	request({ 
 		uri: paginatedUrl,
 		json: true
 	})
 	.then(function(response) {
 		console.log('Received page: ', pageNo);
-		currentCount += R.length(getTransactions(response));
-		transactions = R.concat(transactions, getTransactions(response));
+		txCount += R.length(getTransactions(response));
+		var currentTx = R.concat(transactions, getTransactions(response));
 		var totalTx = getTotalCount(response);
-		if (currentCount < totalTx) {
+		if (txCount < totalTx) {
 			var nextPage = R.inc(pageNo);
-			pageRequest(nextPage);
+			pageRequest(nextPage, txCount, currentTx);
 		} else {
-			console.error('All data received\nexpected: '+ totalTx + '\nreceived: '+ currentCount);
-			onDataRetrieved();
+			console.error('All data received\nExpected Tx: '+ totalTx + '\nReceived Tx: '+ txCount);
+			onDataRetrieved(currentTx);
 		}
 	})
 	.catch(function(error) {
@@ -33,7 +31,7 @@ function pageRequest(pageNo) {
 	});
 }
 
-function onDataRetrieved() {
+function onDataRetrieved(transactions) {
 	console.log('Total Balance: ', totalBalance(transactions));
 	var cleanedVendorTx = R.map(cleanTransaction, transactions);
 	console.log('Cleaned Vendor Names:\n', R.pluck('Company', cleanedVendorTx));
@@ -44,17 +42,19 @@ function onDataRetrieved() {
 
 
 // Initiate Requests
-pageRequest(1);
+pageRequest(1, 0, []);
 
 // We would like you to write an app that connects to an API, downloads all the data, and has a function that will calculate the total balance.
 var totalBalance = R.pipe(R.pluck('Amount'), R.reduce(R.add, 0));
 
 // As a user, I need vendor names to be easily readable. Make the vendor names more readable, remove garbage from names.
 function cleanVendorName(name) {
-	var capitalizeWord = R.converge(R.concat, [
-		R.pipe(R.toUpper, R.slice(0,1)), 
-		R.slice(1, R.dec(R.length(name)))
-	]);	
+	var capitalizeWord = R.converge(
+		R.concat, [
+			R.pipe(R.toUpper, R.slice(0,1)), 
+			R.slice(1, R.dec(R.length(name)))
+		]
+	);	
 	var cleanWord = R.pipe(R.trim, R.toLower, capitalizeWord);
 	var garbageFilter = R.pipe(R.test(/^([xX#]{2,}|@)/), R.not);
 	return R.pipe(
@@ -79,10 +79,8 @@ var dailyTx = R.groupBy(R.prop('Date'));
 function checkDailyDuplicates(transactions, date) {
 	var result = [];
 	for (var i = 0; i < transactions.length; i++) {
-		if (i < transactions.length - 1) {
-			if (transactions[i].Amount === transactions[i + 1].Amount) {
-				result = R.concat([transactions[i], transactions[i+1]], result);
-			}
+		if (i < transactions.length - 1 && transactions[i].Amount === transactions[i + 1].Amount) {
+			result = R.concat([transactions[i], transactions[i+1]], result);
 		}
 	}
 	return result;
@@ -94,11 +92,11 @@ function getDuplicates(transactions) {
 	return R.filter(R.pipe(R.isEmpty, R.not), result);
 }
 
-function createSortable(value, key) {
+function createSortable(amount, dateString) {
 	return {
-		date: +new Date(key),
-		dateString: key,
-		amount: value
+		date: +new Date(dateString),
+		dateString: dateString,
+		amount: amount
 	}
 }
 
@@ -115,5 +113,5 @@ function calculateDailyBalances(transactions) {
 		var newAccum = R.add(value.amount, accum);
 		return [ newAccum, R.assoc(value.dateString, newAccum, {}) ];
 	}, 0, sorted);
-	return result[1];
+	return result[1]; // result = [ accum, value ]
 }
